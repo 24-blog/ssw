@@ -2,9 +2,9 @@
 
 
 ⚠️Music Credits<br>
-BGM∶J_Choir_Chant<br>
-Composer∶PeriTune / むつき醒<br>
-https://peritune.com/Jingle/J_Choir_Chant1-3.zip
+BGM∶maou_se_magic_thunder05<br>
+Composer∶魔王魂<br>
+https://maou.audio/
 
 
 > [!TIP]
