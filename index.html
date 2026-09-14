@@ -25,8 +25,8 @@ canvas {
 <body>
 <canvas id="magic"></canvas>
 
-<!-- BGM：ユーザー操作（タップ/クリック）で再生 -->
-<audio id="bgm" src="chant3.mp3" preload="auto" playsinline></audio>
+<!-- BGM：ユーザー操作で再生 -->
+<audio id="bgm" src="./chant3.mp3" preload="auto" playsinline></audio>
 
 <script>
 const canvas = document.getElementById("magic");
@@ -34,27 +34,37 @@ const ctx = canvas.getContext("2d");
 
 /* ============================================================
    BGM再生
+   ユーザー操作のイベント内でHTMLAudioElement.play()を直接呼び出す。
    ============================================================ */
 const bgm = document.getElementById("bgm");
+let bgmStarted = false;
 
 function startBgm() {
-    bgm.currentTime = 0;
+    if (bgmStarted) return;
 
+    // ユーザー操作直後に即座に再生を要求する
     const promise = bgm.play();
 
     if (promise !== undefined) {
         promise.then(() => {
+            bgmStarted = true;
             removeEventListener("pointerdown", startBgm);
+            removeEventListener("touchstart", startBgm);
             removeEventListener("keydown", startBgm);
         }).catch((err) => {
-            // 再生に失敗した場合は、次のタップ/キー操作で再試行する
             console.log("BGM playback failed:", err);
         });
     }
 }
 
-addEventListener("pointerdown", startBgm);
+// pointerdownを最優先。touchstartも用意して端末差を吸収する。
+addEventListener("pointerdown", startBgm, { passive: true });
+addEventListener("touchstart", startBgm, { passive: true });
 addEventListener("keydown", startBgm);
+
+// ページ読み込み時に音声の読み込みを開始しておく
+bgm.load();
+</script>
 
 let W, H, cx, cy;
 let baseRadius = 0;
