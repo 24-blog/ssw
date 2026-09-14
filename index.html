@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Holy Magic Effect - Optimized</title>
+
+<style>
+html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #04060f;
+}
+
+canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+</style>
+</head>
+
+<body>
+<canvas id="magic"></canvas>
+
+<!--
+  BGM用のaudio要素
+-->
+<audio id="bgm" src="bgm.mp3" preload="auto"></audio>
+
+<script>
+const canvas = document.getElementById("magic");
+const ctx = canvas.getContext("2d");
+
+/* ============================================================
+   BGM自動再生（タップ/クリックで再生開始）
+   主要ブラウザはユーザー操作なしの音声自動再生をブロックするため、
+   画面のどこか一箇所でも最初にタップ/クリックされた時点で再生する。
+   再生に成功したらリスナーを外し、二重再生を防ぐ。
+   ============================================================ */
+const bgm = document.getElementById("bgm");
+
+function startBgm() {
+    bgm.play()
+        .then(() => {
+            // 再生開始に成功したら、以降のタップでは呼ばない
+            removeEventListener("pointerdown", startBgm);
+            removeEventListener("keydown", startBgm);
+        })
+        .catch(() => {
+            // 自動再生ポリシー等で失敗した場合は、次のタップで再試行される
+        });
+}
+
+addEventListener("pointerdown", startBgm);
+addEventListener("keydown", startBgm); // キーボード操作での初回入力にも対応
+
+let W, H, cx, cy;
+let baseRadius = 0;
+const startTime = performance.now();
+let lastTime = startTime;
+
+/* ============================================================
+   リサイズ：ここでのみ重い焼き込み処理を実行する
+   （関数宣言なのでファイル内のどこからでも呼べるが、
+   実際の呼び出しはパーティクル初期化より前で行う必要がある）
+   ============================================================ */
+function resize() {
+    W = canvas.width = innerWidth * devicePixelRatio;
+    H = canvas.height = innerHeight * devicePixelRatio;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(devicePixelRatio, devicePixelRatio);
+
+    W = innerWidth;
+    H = innerHeight;
+    cx = W / 2;
+    cy = H / 2;
+
+    baseRadius = Math.min(W, H) * 0.26;
+    magicSprites = buildMagicSprites(baseRadius);
+    coreGlowSprite = buildCoreGlowSprite(baseRadius);
+    shockwaveSprite = buildShockwaveSprite();
+}
+
+/* ============================================================
+   イージング
+   ============================================================ */
+const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+const easeInCubic  = t => t * t * t;
+const easeInOutSine = t => -(Math.cos(Math.PI * t) - 1) / 2;
+const clamp01 = v => Math.max(0, Math.min(1, v));
+
+/* ============================================================
+   オフスクリーン・スプライト生成ユーティリティ
+   重いshadowBlur／グラデーション計算は「一度だけ」ここで行い、
+   毎フレームはdrawImage（安価なビットブリット）だけで済ませる。
+   ============================================================ */
+function makeOffscreen(sizeCss) {
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.ceil(sizeCss * devicePixelRatio));
+    c.height = Math.max(1, Math.ceil(sizeCss * devicePixelRatio));
+    const octx = c.getContext("2d");
+    octx.scale(devicePixelRatio, devicePixelRatio);
+    return { canvas: c, ctx: octx, size: sizeCss };
+}
+
+/* ============================================================
+   ルーン文字
+   ============================================================ */
+const runes = [
+    "ᚨ","ᛉ","ᚱ","ᛏ","ᚷ","ᛃ",
+    "ᛒ","ᚲ","ᛞ","ᚺ","ᛗ","ᚾ"
+];
+const runesInner = [
+    "ᛟ","ᛊ","ᛁ","ᛖ","ᚹ","ᚦ","ᚠ","ᚻ"
+];
+
+/* ============================================================
+   図形描画ヘルパー（オフスクリーンcanvasに"一度だけ"焼き込むための関数）
+   ============================================================ */
+
+function ringWithTicks(c, radius, alpha, color) {
+    c.beginPath();
+    c.arc(0, 0, radius, 0, Math.PI * 2);
+    c.shadowBlur = 22;
+    c.shadowColor = `rgba(${color},${alpha})`;
+    c.strokeStyle = `rgba(${color},${alpha})`;
+    c.lineWidth = 1.4;
+    c.stroke();
+
+    c.lineWidth = 1.2;
+    for (let i = 0; i < 72; i++) {
+        const a = (i / 72) * Math.PI * 2;
+        const long = i % 6 === 0;
+        const inner = radius - (long ? 12 : 6);
+
+        c.beginPath();
+        c.moveTo(Math.cos(a) * inner, Math.sin(a) * inner);
+        c.lineTo(Math.cos(a) * radius, Math.sin(a) * radius);
+        c.strokeStyle = `rgba(${color},${alpha * (long ? 0.9 : 0.45)})`;
+        c.stroke();
+    }
+    c.shadowBlur = 0;
+}
+
+function dashedRing(c, radius, alpha, color, dash) {
+    c.save();
+    c.setLineDash(dash);
+    c.beginPath();
+    c.arc(0, 0, radius, 0, Math.PI * 2);
+    c.shadowBlur = 18;
+    c.shadowColor = `rgba(${color},${alpha})`;
+    c.strokeStyle = `rgba(${color},${alpha})`;
+    c.lineWidth = 1.6;
+    c.stroke();
+    c.restore();
+    c.shadowBlur = 0;
+}
+
+function starPolygon(c, radius, points, skip, alpha, color) {
+    c.beginPath();
+    for (let i = 0; i <= points; i++) {
+        const idx = (i * skip) % points;
+        const a = (idx / points) * Math.PI * 2 - Math.PI / 2;
+        const x = Math.cos(a) * radius;
+        const y = Math.sin(a) * radius;
+        if (i === 0) c.moveTo(x, y);
+        else c.lineTo(x, y);
+    }
+    c.closePath();
+    c.shadowBlur = 20;
+    c.shadowColor = `rgba(${color},${alpha})`;
+    c.strokeStyle = `rgba(${color},${alpha})`;
+    c.lineWidth = 1.3;
+    c.stroke();
+    c.shadowBlur = 0;
+}
+
+function runeRing(c, radius, alpha, list, color) {
+    c.font = `${Math.max(13, radius * 0.11)}px serif`;
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.fillStyle = `rgba(${color},${alpha})`;
+    c.shadowBlur = 14;
+    c.shadowColor = `rgba(${color},${alpha * 0.9})`;
+
+    for (let i = 0; i < list.length; i++) {
+        const a = (i / list.length) * Math.PI * 2;
+        const x = Math.cos(a) * radius;
+        const y = Math.sin(a) * radius;
+
+        c.save();
+        c.translate(x, y);
+        c.rotate(a + Math.PI / 2);
+        c.fillText(list[i], 0, 0);
+        c.restore();
+    }
+    c.shadowBlur = 0;
+}
+
+function spokes(c, rInner, rOuter, count, alpha, color, altShort) {
+    for (let i = 0; i < count; i++) {
+        const a = (i / count) * Math.PI * 2;
+        const isLong = !altShort || i % 2 === 0;
+        const outer = isLong ? rOuter : rOuter * 0.92;
+
+        c.beginPath();
+        c.moveTo(Math.cos(a) * rInner, Math.sin(a) * rInner);
+        c.lineTo(Math.cos(a) * outer, Math.sin(a) * outer);
+        c.strokeStyle = `rgba(${color},${alpha * (isLong ? 0.8 : 0.4)})`;
+        c.lineWidth = 1;
+        c.stroke();
+    }
+}
+
+/* ============================================================
+   魔法陣スプライトのビルド（リサイズ時のみ実行）
+   6層すべての形状はbaseRadiusにのみ依存し、回転角は毎フレーム
+   ctx.rotate()で付与するだけなので、形状そのものは使い回せる。
+   ============================================================ */
+let magicSprites = null;
+let coreGlowSprite = null;
+let shockwaveSprite = null;
+const SHOCKWAVE_REF = 200; // resize()呼び出しより前に宣言する必要がある（TDZ対策）
+
+function buildMagicSprites(radius) {
+    const size = radius * 2 * 1.35;
+    const half = size / 2;
+
+    function bake(drawFn) {
+        const off = makeOffscreen(size);
+        off.ctx.translate(half, half);
+        drawFn(off.ctx);
+        return off.canvas;
+    }
+
+    const cyan = "205,235,255";
+    const gold = "255,222,160";
+
+    return {
+        size,
+        ring1: bake(c => ringWithTicks(c, radius, 1, cyan)),
+        ring2: bake(c => dashedRing(c, radius * 0.88, 1, gold, [radius * 0.05, radius * 0.03])),
+        star: bake(c => starPolygon(c, radius * 0.72, 3, 2, 1, gold)),
+        runeOuter: bake(c => runeRing(c, radius * 0.62, 1, runes, cyan)),
+        spokesImg: bake(c => spokes(c, radius * 0.62, radius * 0.72, 24, 1, cyan, true)),
+        runeInner: bake(c => runeRing(c, radius * 0.4, 1, runesInner, gold)),
+        core: bake(c => ringWithTicks(c, radius * 0.24, 1, cyan)),
+    };
+}
+
+function buildCoreGlowSprite(radius) {
+    const size = radius * 1.4 * 1.1;
+    const off = makeOffscreen(size);
+    const half = size / 2;
+    const r = radius * 0.7;
+
+    const gradient = off.ctx.createRadialGradient(half, half, 0, half, half, r);
+    gradient.addColorStop(0, "rgba(235,250,255,1)");
+    gradient.addColorStop(0.4, "rgba(190,225,255,0.4)");
+    gradient.addColorStop(1, "rgba(100,160,255,0)");
+
+    off.ctx.fillStyle = gradient;
+    off.ctx.beginPath();
+    off.ctx.arc(half, half, r, 0, Math.PI * 2);
+    off.ctx.fill();
+
+    return { canvas: off.canvas, size };
+}
+
+// 描画（毎フレーム）：drawImageのみで構成される軽量パス
+function drawMagicCircle(sprites, elapsed, alpha, charge, scaleFactor) {
+    const half = sprites.size / 2;
+
+    function layer(img, angle, a) {
+        ctx.save();
+        ctx.rotate(angle);
+        ctx.globalAlpha = a;
+        ctx.drawImage(img, -half, -half, sprites.size, sprites.size);
+        ctx.restore();
+    }
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(scaleFactor, scaleFactor);
+    ctx.globalCompositeOperation = "lighter";
+
+    layer(sprites.ring1, elapsed * 0.12, alpha * 0.9);
+    layer(sprites.ring2, -elapsed * 0.28, alpha * 0.75);
+    layer(sprites.star, -elapsed * 0.08, alpha * (0.55 + charge * 0.35));
+    layer(sprites.star, -elapsed * 0.08 + Math.PI, alpha * (0.55 + charge * 0.35));
+    layer(sprites.runeOuter, elapsed * 0.2, alpha * 0.95);
+    layer(sprites.spokesImg, elapsed * 0.2, alpha);
+    layer(sprites.runeInner, -elapsed * 0.45, alpha * 0.85);
+
+    const pulse = 0.85 + Math.sin(elapsed * 4) * 0.15 * (0.4 + charge * 0.6);
+    ctx.save();
+    ctx.scale(pulse, pulse);
+    ctx.globalAlpha = alpha * (0.7 + charge * 0.3);
+    ctx.drawImage(sprites.core, -half, -half, sprites.size, sprites.size);
+    ctx.restore();
+
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+    ctx.restore();
+}
+
+/* ============================================================
+   光の雨（ライトシャワー） - スプライト方式
+   ============================================================ */
+const STREAK_REF_LEN = 40;
+const STREAK_REF_THICK = 8;
+const DOT_REF = 16;
+
+function buildStreakSprite(color) {
+    const off = makeOffscreen(STREAK_REF_LEN);
+    const g = off.ctx.createLinearGradient(0, 0, STREAK_REF_LEN, 0);
+    g.addColorStop(0, `rgba(${color},1)`);
+    g.addColorStop(1, `rgba(${color},0)`);
+    off.ctx.fillStyle = g;
+    off.ctx.fillRect(0, (STREAK_REF_LEN - STREAK_REF_THICK) / 2, STREAK_REF_LEN, STREAK_REF_THICK);
+    return off.canvas;
+}
+
+function buildDotSprite() {
+    const off = makeOffscreen(DOT_REF);
+    const half = DOT_REF / 2;
+    const g = off.ctx.createRadialGradient(half, half, 0, half, half, half);
+    g.addColorStop(0, "rgba(255,255,255,1)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    off.ctx.fillStyle = g;
+    off.ctx.beginPath();
+    off.ctx.arc(half, half, half, 0, Math.PI * 2);
+    off.ctx.fill();
+    return off.canvas;
+}
+
+const streakCyan = buildStreakSprite("200,235,255");
+const streakGold = buildStreakSprite("255,225,170");
+const dotSprite = buildDotSprite();
+
+/* resize()はここで一度呼んでおく必要がある。
+   これより下のパーティクル初期化がW/Hに依存するため、
+   呼び出しが後だとW/Hがundefined＝座標がNaNになり、
+   パーティクルが二度と表示されなくなる（実際に起きたバグ）。 */
+resize();
+addEventListener("resize", resize);
+
+const PARTICLE_COUNT = 130;
+const particles = [];
+
+function spawnParticle(p) {
+    p.x = Math.random() * W;
+    p.y = -Math.random() * H * 0.6 - 20;
+    p.speed = 90 + Math.random() * 140;
+    p.len = 14 + Math.random() * 26;
+    p.width = 0.6 + Math.random() * 1.3;
+    p.sway = Math.random() * Math.PI * 2;
+    p.swaySpeed = 0.6 + Math.random() * 1.2;
+    p.gold = Math.random() < 0.22;
+    p.baseAlpha = 0.35 + Math.random() * 0.5;
+}
+
+for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const p = {};
+    spawnParticle(p);
+    p.y = Math.random() * H;
+    particles.push(p);
+}
+
+function updateAndDrawParticles(dt, radius, charge) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+
+    const pullRadius = radius * 2.0;
+
+    for (const p of particles) {
+        p.sway += p.swaySpeed * dt;
+        const driftX = Math.sin(p.sway) * 10;
+
+        let vx = driftX;
+        let vy = p.speed;
+
+        const dx = cx - p.x;
+        const dy = cy - p.y;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist < pullRadius) {
+            const pull = (1 - dist / pullRadius) * (60 + charge * 260);
+            vx += (dx / (dist || 1)) * pull * dt * 10;
+            vy += (dy / (dist || 1)) * pull * dt * 10 * 0.4;
+        }
+
+        p.x += vx * dt;
+        p.y += vy * dt;
+
+        const distNow = Math.hypot(cx - p.x, cy - p.y);
+        if (distNow < radius * 0.22 || p.y > H + 30) {
+            spawnParticle(p);
+            continue;
+        }
+
+        const alpha = p.baseAlpha * (0.6 + charge * 0.4);
+        const speedMag = Math.hypot(vx, vy) || 1;
+        const tailLen = Math.min(60, p.len * 0.02 * speedMag);
+        const angle = Math.atan2(vy, vx) + Math.PI; // 進行方向の逆（尾）を向く
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(angle);
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(
+            p.gold ? streakGold : streakCyan,
+            0, -p.width * 1.4,
+            tailLen, p.width * 2.8
+        );
+        ctx.drawImage(
+            dotSprite,
+            -p.width * 1.1, -p.width * 1.1,
+            p.width * 2.2, p.width * 2.2
+        );
+        ctx.restore();
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
+}
+
+/* ============================================================
+   衝撃波リング（詠唱完了時のバースト） - スプライト方式
+   ============================================================ */
+function buildShockwaveSprite() {
+    const off = makeOffscreen(SHOCKWAVE_REF);
+    const half = SHOCKWAVE_REF / 2;
+    const r = half - 6;
+
+    off.ctx.beginPath();
+    off.ctx.arc(half, half, r, 0, Math.PI * 2);
+    off.ctx.shadowBlur = 25;
+    off.ctx.shadowColor = "rgba(220,240,255,1)";
+    off.ctx.strokeStyle = "rgba(230,245,255,1)";
+    off.ctx.lineWidth = 2.5;
+    off.ctx.stroke();
+
+    return off.canvas;
+}
+
+const shockwaves = [];
+
+// (shockwaveSpriteの宣言は先頭付近に移動済み)
+
+function spawnShockwave(maxRadius) {
+    shockwaves.push({ r: 4, maxRadius, alpha: 1 });
+}
+
+function updateAndDrawShockwaves(dt) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+
+    for (let i = shockwaves.length - 1; i >= 0; i--) {
+        const s = shockwaves[i];
+        s.r += (s.maxRadius - s.r) * dt * 2.2 + 60 * dt;
+        s.alpha -= dt * 0.9;
+
+        if (s.alpha <= 0) {
+            shockwaves.splice(i, 1);
+            continue;
+        }
+
+        const d = s.r * 2;
+        ctx.globalAlpha = s.alpha;
+        ctx.drawImage(shockwaveSprite, cx - s.r, cy - s.r, d, d);
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
+}
+
+/* ============================================================
+   メインループ
+   ============================================================ */
+const CYCLE = 5.5;
+let burstFiredThisCycle = false;
+
+function draw(now) {
+    const dtRaw = (now - lastTime) / 1000;
+    const dt = Math.min(dtRaw, 0.05);
+    lastTime = now;
+
+    const elapsed = (now - startTime) / 1000;
+    const phase = elapsed % CYCLE;
+
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "rgba(4,6,15,0.24)";
+    ctx.fillRect(0, 0, W, H);
+
+    let radius, alpha, charge;
+
+    if (phase < 0.8) {
+        const t = easeOutCubic(phase / 0.8);
+        radius = baseRadius * (0.25 + 0.75 * t);
+        alpha = t;
+        charge = 0;
+        burstFiredThisCycle = false;
+    } else if (phase < 3.3) {
+        const t = clamp01((phase - 0.8) / 2.5);
+        radius = baseRadius;
+        alpha = 1;
+        charge = easeInOutSine(t);
+    } else if (phase < 3.7) {
+        const t = clamp01((phase - 3.3) / 0.4);
+        radius = baseRadius * (1 + t * 0.08);
+        alpha = 1;
+        charge = 1;
+
+        if (!burstFiredThisCycle) {
+            spawnShockwave(baseRadius * 3.2);
+            spawnShockwave(baseRadius * 2.2);
+            burstFiredThisCycle = true;
+        }
+    } else {
+        const t = clamp01((phase - 3.7) / 1.8);
+        radius = baseRadius * (1 - easeInCubic(t) * 0.7);
+        alpha = 1 - easeInCubic(t);
+        charge = Math.max(0, 1 - t * 1.4);
+    }
+
+    updateAndDrawParticles(dt, baseRadius, charge);
+
+    // 中央の淡いグロー（事前焼き込み済みスプライトを伸縮させるだけ）
+    const glowStrength = 0.14 + charge * 0.18;
+    const glowSize = coreGlowSprite.size * (radius / baseRadius);
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = glowStrength;
+    ctx.drawImage(
+        coreGlowSprite.canvas,
+        cx - glowSize / 2, cy - glowSize / 2,
+        glowSize, glowSize
+    );
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    if (alpha > 0.01) {
+        drawMagicCircle(magicSprites, elapsed, alpha, charge, radius / baseRadius);
+    }
+
+    updateAndDrawShockwaves(dt);
+
+    if (phase > 3.3 && phase < 3.9) {
+        const a = 1 - Math.abs(phase - 3.5) / 0.5;
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.fillStyle = `rgba(235,248,255,${clamp01(a) * 0.5})`;
+        ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+    }
+
+    requestAnimationFrame(draw);
+}
+
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>
