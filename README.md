@@ -2,7 +2,7 @@
 
 
 ⚠️Music Credits<br>
-BGM∶PerituneMaterial_J_Choir<br>
+BGM∶J_Choir_Chant<br>
 Composer∶PeriTune / むつき醒<br>
 https://peritune.com/Jingle/J_Choir_Chant1-3.zip
 
