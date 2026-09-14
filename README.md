@@ -3,8 +3,8 @@
 
 ⚠️Music Credits<br>
 BGM∶ジングル・コーラス(神秘)<br>
-Composer∶PeriTune / むつき醒 (Sei Mutsuki)<br>
-http://peritune.com/Jingle/J_Choir_Chant1-3.zip
+Composer∶PeriTune / むつき醒<br>
+https://peritune.com/Jingle/J_Choir_Chant1-3.zip
 
 
 > [!TIP]
