@@ -24,47 +24,11 @@ canvas {
 
 <body>
 <canvas id="magic"></canvas>
-
-<!-- BGM：ユーザー操作で再生 -->
-<audio id="bgm" src="./chant3.mp3" preload="auto" playsinline></audio>
+<audio id="bgm" src="bgm.mp3" loop preload="auto"></audio>
 
 <script>
 const canvas = document.getElementById("magic");
 const ctx = canvas.getContext("2d");
-
-/* ============================================================
-   BGM再生
-   ユーザー操作のイベント内でHTMLAudioElement.play()を直接呼び出す。
-   ============================================================ */
-const bgm = document.getElementById("bgm");
-let bgmStarted = false;
-
-function startBgm() {
-    if (bgmStarted) return;
-
-    // ユーザー操作直後に即座に再生を要求する
-    const promise = bgm.play();
-
-    if (promise !== undefined) {
-        promise.then(() => {
-            bgmStarted = true;
-            removeEventListener("pointerdown", startBgm);
-            removeEventListener("touchstart", startBgm);
-            removeEventListener("keydown", startBgm);
-        }).catch((err) => {
-            console.log("BGM playback failed:", err);
-        });
-    }
-}
-
-// pointerdownを最優先。touchstartも用意して端末差を吸収する。
-addEventListener("pointerdown", startBgm, { passive: true });
-addEventListener("touchstart", startBgm, { passive: true });
-addEventListener("keydown", startBgm);
-
-// ページ読み込み時に音声の読み込みを開始しておく
-bgm.load();
-</script>
 
 let W, H, cx, cy;
 let baseRadius = 0;
@@ -231,8 +195,27 @@ function spokes(c, rInner, rOuter, count, alpha, color, altShort) {
    ============================================================ */
 let magicSprites = null;
 let coreGlowSprite = null;
-let shockwaveSprite = null;
-const SHOCKWAVE_REF = 200; // resize()呼び出しより前に宣言する必要がある（TDZ対策）
+let shockwaveSprite = null; // resize()より前に宣言する必要がある(TDZ回避)
+
+/* 衝撃波スプライトの生成関数と参照サイズも、resize()から呼ばれる
+   ため必ずここ(呼び出しより前)で定義しておく(TDZ回避)。 */
+const SHOCKWAVE_REF = 200;
+
+function buildShockwaveSprite() {
+    const off = makeOffscreen(SHOCKWAVE_REF);
+    const half = SHOCKWAVE_REF / 2;
+    const r = half - 6;
+
+    off.ctx.beginPath();
+    off.ctx.arc(half, half, r, 0, Math.PI * 2);
+    off.ctx.shadowBlur = 25;
+    off.ctx.shadowColor = "rgba(220,240,255,1)";
+    off.ctx.strokeStyle = "rgba(230,245,255,1)";
+    off.ctx.lineWidth = 2.5;
+    off.ctx.stroke();
+
+    return off.canvas;
+}
 
 function buildMagicSprites(radius) {
     const size = radius * 2 * 1.35;
@@ -440,25 +423,7 @@ function updateAndDrawParticles(dt, radius, charge) {
 /* ============================================================
    衝撃波リング（詠唱完了時のバースト） - スプライト方式
    ============================================================ */
-function buildShockwaveSprite() {
-    const off = makeOffscreen(SHOCKWAVE_REF);
-    const half = SHOCKWAVE_REF / 2;
-    const r = half - 6;
-
-    off.ctx.beginPath();
-    off.ctx.arc(half, half, r, 0, Math.PI * 2);
-    off.ctx.shadowBlur = 25;
-    off.ctx.shadowColor = "rgba(220,240,255,1)";
-    off.ctx.strokeStyle = "rgba(230,245,255,1)";
-    off.ctx.lineWidth = 2.5;
-    off.ctx.stroke();
-
-    return off.canvas;
-}
-
 const shockwaves = [];
-
-// (shockwaveSpriteの宣言は先頭付近に移動済み)
 
 function spawnShockwave(maxRadius) {
     shockwaves.push({ r: 4, maxRadius, alpha: 1 });
@@ -572,6 +537,23 @@ function draw(now) {
 }
 
 requestAnimationFrame(draw);
+
+/* ============================================================
+   BGM再生：画面のどこか一箇所を一度タップ/クリックした時点で
+   ループ再生を開始する（ブラウザの自動再生制限に対応するため、
+   ユーザー操作をきっかけに再生する必要がある）。
+   ============================================================ */
+const bgm = document.getElementById("bgm");
+
+function startBGM() {
+    bgm.play().catch(() => {
+        /* 再生に失敗した場合は次のタップで再試行できるよう
+           リスナーを再登録する */
+        window.addEventListener("pointerdown", startBGM, { once: true });
+    });
+}
+
+window.addEventListener("pointerdown", startBGM, { once: true });
 </script>
 </body>
 </html>
