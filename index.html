@@ -25,37 +25,61 @@ canvas {
 <body>
 <canvas id="magic"></canvas>
 
-<!--
-  BGM用のaudio要素
--->
-<audio id="bgm" src="peritunematerial_j_choir_chant3.mp3" preload="auto"></audio>
-
 <script>
 const canvas = document.getElementById("magic");
 const ctx = canvas.getContext("2d");
 
 /* ============================================================
    BGM自動再生（タップ/クリックで再生開始）
-   主要ブラウザはユーザー操作なしの音声自動再生をブロックするため、
-   画面のどこか一箇所でも最初にタップ/クリックされた時点で再生する。
-   再生に成功したらリスナーを外し、二重再生を防ぐ。
    ============================================================ */
-const bgm = document.getElementById("bgm");
+const BGM_SRC = "peritunematerial_j_choir_chant3.mp3"; 
+
+let bgmBuffer = null;
+let audioCtx = null;
+
+// デコード用の一時的なOfflineAudioContext（再生はしない、decodeAudioData専用）
+(function preloadBgm() {
+    const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!OfflineCtx) return;
+
+    const decoder = new OfflineCtx(2, 1, 44100);
+
+    fetch(BGM_SRC)
+        .then(res => res.arrayBuffer())
+        .then(data => decoder.decodeAudioData(data))
+        .then(buffer => { bgmBuffer = buffer; })
+        .catch(() => {
+            // 音源ファイルが見つからない/デコード失敗時はBGMなしで続行
+        });
+})();
 
 function startBgm() {
-    bgm.play()
-        .then(() => {
-            // 再生開始に成功したら、以降のタップでは呼ばない
-            removeEventListener("pointerdown", startBgm);
-            removeEventListener("keydown", startBgm);
-        })
-        .catch(() => {
-            // 自動再生ポリシー等で失敗した場合は、次のタップで再試行される
-        });
+    // AudioContextの生成・resumeは必ずユーザー操作のハンドラ内で行う
+    if (!audioCtx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        audioCtx = new Ctx();
+    }
+    if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+    }
+
+    if (bgmBuffer) {
+        const source = audioCtx.createBufferSource();
+        source.buffer = bgmBuffer;
+        source.connect(audioCtx.destination);
+        source.start(0);
+
+        removeEventListener("pointerdown", startBgm);
+        removeEventListener("keydown", startBgm);
+    }
+    // bgmBufferがまだ読み込み中なら何もしない。
+    // 通常9秒程度のジングルはタップより先にデコードが終わっているため、
+    // このケースはほぼ発生しない想定。
 }
 
 addEventListener("pointerdown", startBgm);
-addEventListener("keydown", startBgm); // キーボード操作での初回入力にも対応
+addEventListener("keydown", startBgm);
 
 let W, H, cx, cy;
 let baseRadius = 0;
