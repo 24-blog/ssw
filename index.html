@@ -25,6 +25,9 @@ canvas {
 <body>
 <canvas id="magic"></canvas>
 
+<!-- fetch()が使えない環境向けフォールバック -->
+<audio id="bgm-fallback" src="bgm.mp3" preload="auto" style="display:none"></audio>
+
 <script>
 const canvas = document.getElementById("magic");
 const ctx = canvas.getContext("2d");
@@ -32,50 +35,77 @@ const ctx = canvas.getContext("2d");
 /* ============================================================
    BGM自動再生（タップ/クリックで再生開始）
    ============================================================ */
-const BGM_SRC = "peritunematerial_j_choir_chant3.mp3";　// 音源ファイル
+const BGM_SRC = "peritunematerial_j_choir_chant3.mp3"; // 音源ファイル名へ書き換え
+const bgmFallbackEl = document.getElementById("bgm-fallback");
 
 let bgmBuffer = null;
 let audioCtx = null;
+let fetchFailed = false;
 
-// デコード用の一時的なOfflineAudioContext（再生はしない、decodeAudioData専用）
 (function preloadBgm() {
     const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-    if (!OfflineCtx) return;
+    if (!OfflineCtx) {
+        fetchFailed = true;
+        return;
+    }
 
     const decoder = new OfflineCtx(2, 1, 44100);
 
+    if (typeof fetch !== "function") {
+        fetchFailed = true;
+        return;
+    }
+
     fetch(BGM_SRC)
-        .then(res => res.arrayBuffer())
+        .then(res => {
+            if (!res.ok) throw new Error("fetch failed: " + res.status);
+            return res.arrayBuffer();
+        })
         .then(data => decoder.decodeAudioData(data))
         .then(buffer => { bgmBuffer = buffer; })
         .catch(() => {
-            // 音源ファイルが見つからない/デコード失敗時はBGMなしで続行
+            // file://環境などでfetchが使えない場合は<audio>にフォールバック
+            fetchFailed = true;
         });
 })();
 
 function startBgm() {
-    // AudioContextの生成・resumeは必ずユーザー操作のハンドラ内で行う
-    if (!audioCtx) {
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        if (!Ctx) return;
-        audioCtx = new Ctx();
-    }
-    if (audioCtx.state === "suspended") {
-        audioCtx.resume();
-    }
-
+    // 経路1：事前デコードに成功している場合（最も確実に1回目のタップで鳴る）
     if (bgmBuffer) {
-        const source = audioCtx.createBufferSource();
-        source.buffer = bgmBuffer;
-        source.connect(audioCtx.destination);
-        source.start(0);
+        if (!audioCtx) {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (Ctx) audioCtx = new Ctx();
+        }
+        if (audioCtx) {
+            if (audioCtx.state === "suspended") audioCtx.resume();
 
-        removeEventListener("pointerdown", startBgm);
-        removeEventListener("keydown", startBgm);
+            const source = audioCtx.createBufferSource();
+            source.buffer = bgmBuffer;
+            source.connect(audioCtx.destination);
+            source.start(0);
+
+            removeEventListener("pointerdown", startBgm);
+            removeEventListener("keydown", startBgm);
+            return;
+        }
     }
-    // bgmBufferがまだ読み込み中なら何もしない。
-    // 通常9秒程度のジングルはタップより先にデコードが終わっているため、
-    // このケースはほぼ発生しない想定。
+
+    // 経路2：fetchが使えない環境向けのフォールバック（<audio>要素）
+    if (fetchFailed) {
+        bgmFallbackEl.currentTime = 0;
+        bgmFallbackEl.play()
+            .then(() => {
+                removeEventListener("pointerdown", startBgm);
+                removeEventListener("keydown", startBgm);
+            })
+            .catch(() => {
+                // 失敗した場合は次のタップで再試行される
+            });
+        return;
+    }
+
+    // まだプリロード中：このタップでは再生せず、次のタップに委ねる
+    // （通常は9秒程度のジングルなら一瞬で完了する）
 }
 
 addEventListener("pointerdown", startBgm);
