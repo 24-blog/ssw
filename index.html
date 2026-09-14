@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Holy Magic Effect - Optimized</title>
+<title>Magic Effect</title>
 
 <style>
 html, body {
@@ -25,87 +25,32 @@ canvas {
 <body>
 <canvas id="magic"></canvas>
 
-<!-- fetch()が使えない環境向けフォールバック -->
-<audio id="bgm-fallback" src="chant3.mp3" preload="auto" style="display:none"></audio>
+<!-- BGM：ユーザー操作（タップ/クリック）で再生 -->
+<audio id="bgm" src="chant3.mp3" preload="auto" playsinline></audio>
 
 <script>
 const canvas = document.getElementById("magic");
 const ctx = canvas.getContext("2d");
 
 /* ============================================================
-   BGM自動再生（タップ/クリックで再生開始）
+   BGM再生
    ============================================================ */
-const BGM_SRC = "chant3.mp3"; // 音源ファイル名へ書き換え
-const bgmFallbackEl = document.getElementById("bgm-fallback");
-
-let bgmBuffer = null;
-let audioCtx = null;
-let fetchFailed = false;
-
-(function preloadBgm() {
-    const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-    if (!OfflineCtx) {
-        fetchFailed = true;
-        return;
-    }
-
-    const decoder = new OfflineCtx(2, 1, 44100);
-
-    if (typeof fetch !== "function") {
-        fetchFailed = true;
-        return;
-    }
-
-    fetch(BGM_SRC)
-        .then(res => {
-            if (!res.ok) throw new Error("fetch failed: " + res.status);
-            return res.arrayBuffer();
-        })
-        .then(data => decoder.decodeAudioData(data))
-        .then(buffer => { bgmBuffer = buffer; })
-        .catch(() => {
-            // file://環境などでfetchが使えない場合は<audio>にフォールバック
-            fetchFailed = true;
-        });
-})();
+const bgm = document.getElementById("bgm");
 
 function startBgm() {
-    // 経路1：事前デコードに成功している場合（最も確実に1回目のタップで鳴る）
-    if (bgmBuffer) {
-        if (!audioCtx) {
-            const Ctx = window.AudioContext || window.webkitAudioContext;
-            if (Ctx) audioCtx = new Ctx();
-        }
-        if (audioCtx) {
-            if (audioCtx.state === "suspended") audioCtx.resume();
+    bgm.currentTime = 0;
 
-            const source = audioCtx.createBufferSource();
-            source.buffer = bgmBuffer;
-            source.connect(audioCtx.destination);
-            source.start(0);
+    const promise = bgm.play();
 
+    if (promise !== undefined) {
+        promise.then(() => {
             removeEventListener("pointerdown", startBgm);
             removeEventListener("keydown", startBgm);
-            return;
-        }
+        }).catch((err) => {
+            // 再生に失敗した場合は、次のタップ/キー操作で再試行する
+            console.log("BGM playback failed:", err);
+        });
     }
-
-    // 経路2：fetchが使えない環境向けのフォールバック（<audio>要素）
-    if (fetchFailed) {
-        bgmFallbackEl.currentTime = 0;
-        bgmFallbackEl.play()
-            .then(() => {
-                removeEventListener("pointerdown", startBgm);
-                removeEventListener("keydown", startBgm);
-            })
-            .catch(() => {
-                // 失敗した場合は次のタップで再試行される
-            });
-        return;
-    }
-
-    // まだプリロード中：このタップでは再生せず、次のタップに委ねる
-    // （通常は9秒程度のジングルなら一瞬で完了する）
 }
 
 addEventListener("pointerdown", startBgm);
