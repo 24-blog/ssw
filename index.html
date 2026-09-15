@@ -24,7 +24,7 @@ canvas {
 
 <body>
 <canvas id="magic"></canvas>
-<audio id="bgm" src="bgm.mp3" loop preload="auto"></audio>
+<audio id="bgm" src="maou_se_magic_thunder05.mp3" loop preload="auto"></audio>
 
 <script>
 const canvas = document.getElementById("magic");
@@ -198,7 +198,7 @@ let coreGlowSprite = null;
 let shockwaveSprite = null; // resize()より前に宣言する必要がある(TDZ回避)
 
 /* 衝撃波スプライトの生成関数と参照サイズも、resize()から呼ばれる
-   ため必ずここ(呼び出しより前)で定義しておく(TDZ回避)。 */
+   ため必ずここ(呼び出しより前)で定義しておく。(TDZ回避) */
 const SHOCKWAVE_REF = 200;
 
 function buildShockwaveSprite() {
@@ -336,7 +336,7 @@ const dotSprite = buildDotSprite();
 /* ============================================================
    タップ誘導ヒント：画面下部で「トン・トン」と二回連続で波紋が
    広がる演出。初回タップ／クリックで自然にフェードアウトして
-   二度と表示されなくなる（stopTapHint参照）。
+   二度と表示されなくなる。（stopTapHint参照）
    ============================================================ */
 const TAP_HINT_REF = 64;
 
@@ -418,7 +418,7 @@ function updateAndDrawTapHint(dt) {
 /* resize()はここで一度呼んでおく必要がある。
    これより下のパーティクル初期化がW/Hに依存するため、
    呼び出しが後だとW/Hがundefined＝座標がNaNになり、
-   パーティクルが二度と表示されなくなる（実際に起きたバグ）。 */
+   パーティクルが二度と表示されなくなる。（実際に起きたバグ） */
 resize();
 addEventListener("resize", resize);
 
@@ -623,8 +623,8 @@ requestAnimationFrame(draw);
 
 /* ============================================================
    BGM再生：画面のどこか一箇所を一度タップ/クリックした時点で
-   ループ再生を開始する（ブラウザの自動再生制限に対応するため、
-   ユーザー操作をきっかけに再生する必要がある）。
+   ループ再生を開始する。（ブラウザの自動再生制限に対応するため、
+   ユーザー操作をきっかけに再生する必要がある）
    ============================================================ */
 const bgm = document.getElementById("bgm");
 
@@ -632,7 +632,7 @@ function startBGM() {
     stopTapHint();
     bgm.play().catch(() => {
         /* 再生に失敗した場合は次のタップで再試行できるよう
-           リスナーを再登録する */
+           リスナーを再登録する。 */
         window.addEventListener("pointerdown", startBGM, { once: true });
     });
 }
