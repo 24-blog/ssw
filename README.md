@@ -4,7 +4,7 @@
 ### 呪文テキスト
 いでよ浄闇を照らす砕けし星の陰<br>
 泥黎顕現<br>
-Shadow of Sundered Star
+shade of Sundered Star
 
 ⚠️COPYRIGHT<br>
 Textual commentary written by the repository owner is
