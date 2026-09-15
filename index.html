@@ -24,7 +24,7 @@ canvas {
 
 <body>
 <canvas id="magic"></canvas>
-<audio id="bgm" src="maou_se_magic_thunder05.mp3" loop preload="auto"></audio>
+<audio id="bgm" src="bgm.mp3" loop preload="auto"></audio>
 
 <script>
 const canvas = document.getElementById("magic");
@@ -68,7 +68,7 @@ const clamp01 = v => Math.max(0, Math.min(1, v));
 /* ============================================================
    オフスクリーン・スプライト生成ユーティリティ
    重いshadowBlur／グラデーション計算は「一度だけ」ここで行い、
-   毎フレームはdrawImage（安価なビットブリット）だけで済ませる
+   毎フレームはdrawImage（安価なビットブリット）だけで済ませる。
    ============================================================ */
 function makeOffscreen(sizeCss) {
     const c = document.createElement("canvas");
@@ -191,14 +191,14 @@ function spokes(c, rInner, rOuter, count, alpha, color, altShort) {
 /* ============================================================
    魔法陣スプライトのビルド（リサイズ時のみ実行）
    6層すべての形状はbaseRadiusにのみ依存し、回転角は毎フレーム
-   ctx.rotate()で付与するだけなので、形状そのものは使い回せる
+   ctx.rotate()で付与するだけなので、形状そのものは使い回せる。
    ============================================================ */
 let magicSprites = null;
 let coreGlowSprite = null;
 let shockwaveSprite = null; // resize()より前に宣言する必要がある(TDZ回避)
 
 /* 衝撃波スプライトの生成関数と参照サイズも、resize()から呼ばれる
-   ため必ずここ(呼び出しより前)で定義しておく(TDZ回避) */
+   ため必ずここ(呼び出しより前)で定義しておく(TDZ回避)。 */
 const SHOCKWAVE_REF = 200;
 
 function buildShockwaveSprite() {
@@ -333,10 +333,92 @@ const streakCyan = buildStreakSprite("200,235,255");
 const streakGold = buildStreakSprite("255,225,170");
 const dotSprite = buildDotSprite();
 
-/* resize()はここで一度呼んでおく必要がある
+/* ============================================================
+   タップ誘導ヒント：画面下部で「トン・トン」と二回連続で波紋が
+   広がる演出。初回タップ／クリックで自然にフェードアウトして
+   二度と表示されなくなる（stopTapHint参照）。
+   ============================================================ */
+const TAP_HINT_REF = 64;
+
+function buildTapHintRippleSprite() {
+    const off = makeOffscreen(TAP_HINT_REF);
+    const half = TAP_HINT_REF / 2;
+    const r = half - 4;
+
+    off.ctx.beginPath();
+    off.ctx.arc(half, half, r, 0, Math.PI * 2);
+    off.ctx.shadowBlur = 14;
+    off.ctx.shadowColor = "rgba(210,235,255,1)";
+    off.ctx.strokeStyle = "rgba(210,235,255,1)";
+    off.ctx.lineWidth = 1.6;
+    off.ctx.stroke();
+
+    return off.canvas;
+}
+
+const tapHintRippleSprite = buildTapHintRippleSprite();
+const tapHintRipples = [];
+
+let tapHintActive = true;   // falseになったら新規の波紋を出さない
+let tapHintCycleTime = 0;   // 現在のサイクル内の経過時間
+let tapHintStage = 0;       // 0:1回目待ち 1:2回目待ち 2:間隔待ち
+
+const TAP_HINT_PERIOD = 2.6; // 1セット(2回)の周期
+const TAP_HINT_GAP = 0.3;    // 1回目と2回目の間隔
+const TAP_HINT_MAX_R = 26;   // 波紋の最大半径
+
+function spawnTapHintRipple() {
+    tapHintRipples.push({ r: 3, alpha: 0.8 });
+}
+
+function stopTapHint() {
+    tapHintActive = false; // 既存の波紋は自然にフェードアウトさせる
+}
+
+function updateAndDrawTapHint(dt) {
+    if (tapHintActive) {
+        tapHintCycleTime += dt;
+        if (tapHintStage === 0) {
+            spawnTapHintRipple();
+            tapHintStage = 1;
+        } else if (tapHintStage === 1 && tapHintCycleTime >= TAP_HINT_GAP) {
+            spawnTapHintRipple();
+            tapHintStage = 2;
+        } else if (tapHintStage === 2 && tapHintCycleTime >= TAP_HINT_PERIOD) {
+            tapHintCycleTime = 0;
+            tapHintStage = 0;
+        }
+    }
+
+    if (tapHintRipples.length === 0) return;
+
+    const hx = W / 2;
+    const hy = H - Math.max(48, H * 0.08);
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+
+    for (let i = tapHintRipples.length - 1; i >= 0; i--) {
+        const p = tapHintRipples[i];
+        p.r += dt * 40;
+        p.alpha -= dt * 1.4;
+        if (p.alpha <= 0 || p.r > TAP_HINT_MAX_R) {
+            tapHintRipples.splice(i, 1);
+            continue;
+        }
+        const d = p.r * 2;
+        ctx.globalAlpha = p.alpha;
+        ctx.drawImage(tapHintRippleSprite, hx - p.r, hy - p.r, d, d);
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
+}
+
+/* resize()はここで一度呼んでおく必要がある。
    これより下のパーティクル初期化がW/Hに依存するため、
    呼び出しが後だとW/Hがundefined＝座標がNaNになり、
-   パーティクルが二度と表示されなくなる（実際に起きたバグ） */
+   パーティクルが二度と表示されなくなる（実際に起きたバグ）。 */
 resize();
 addEventListener("resize", resize);
 
@@ -523,6 +605,7 @@ function draw(now) {
     }
 
     updateAndDrawShockwaves(dt);
+    updateAndDrawTapHint(dt);
 
     if (phase > 3.3 && phase < 3.9) {
         const a = 1 - Math.abs(phase - 3.5) / 0.5;
@@ -541,11 +624,12 @@ requestAnimationFrame(draw);
 /* ============================================================
    BGM再生：画面のどこか一箇所を一度タップ/クリックした時点で
    ループ再生を開始する（ブラウザの自動再生制限に対応するため、
-   ユーザー操作で発火させる必要がある）
+   ユーザー操作をきっかけに再生する必要がある）。
    ============================================================ */
 const bgm = document.getElementById("bgm");
 
 function startBGM() {
+    stopTapHint();
     bgm.play().catch(() => {
         /* 再生に失敗した場合は次のタップで再試行できるよう
            リスナーを再登録する */
