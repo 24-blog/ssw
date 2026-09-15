@@ -5,3 +5,7 @@
 BGM∶maou_se_magic_thunder05<br>
 Composer∶魔王魂<br>
 https://maou.audio/category/se/se-magic/page/6/
+
+
+> [!TIP]
+> 改良点∶1タップで再生しない
