@@ -375,6 +375,68 @@ function stopTapHint() {
     tapHintActive = false; // 既存の波紋は自然にフェードアウトさせる
 }
 
+/* ============================================================
+   呪文詠唱テキスト：1行ずつ「発光しつつ出現→保持→消える」を
+   繰り返す。3行目はバースト演出(3.3〜3.7秒)と重なるように
+   タイミングを合わせ、フラッシュの中でも視認できるよう
+   draw()の最後（フラッシュより後）に描画する。
+   ============================================================ */
+const INCANTATION_LINES = [
+    {
+        text: "いでよ浄闇を照らす砕けし星の陰",
+        color: "205,235,255",
+        fontRatio: 0.032, minFont: 14, maxFont: 26,
+        emphasis: false,
+        start: 0.85, holdStart: 1.15, holdEnd: 1.85, end: 2.15,
+    },
+    {
+        text: "泥黎顕現",
+        color: "205,235,255",
+        fontRatio: 0.05, minFont: 20, maxFont: 40,
+        emphasis: false,
+        start: 2.25, holdStart: 2.45, holdEnd: 2.85, end: 3.05,
+    },
+    {
+        text: "Shadow of Sundered Star！！",
+        color: "255,222,160",
+        fontRatio: 0.045, minFont: 18, maxFont: 34,
+        emphasis: true,
+        start: 3.15, holdStart: 3.45, holdEnd: 4.25, end: 4.55,
+    },
+];
+
+function drawIncantationText(phase) {
+    for (const line of INCANTATION_LINES) {
+        if (phase < line.start || phase > line.end) continue;
+
+        let alpha;
+        if (phase < line.holdStart) {
+            alpha = easeOutCubic((phase - line.start) / (line.holdStart - line.start));
+        } else if (phase <= line.holdEnd) {
+            alpha = 1;
+        } else {
+            alpha = 1 - easeInCubic((phase - line.holdEnd) / (line.end - line.holdEnd));
+        }
+        alpha = clamp01(alpha);
+        if (alpha <= 0.01) continue;
+
+        const fontSize = Math.min(line.maxFont, Math.max(line.minFont, W * line.fontRatio));
+
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = alpha;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = `${line.emphasis ? "bold " : ""}${fontSize}px serif`;
+        ctx.shadowBlur = line.emphasis ? 28 : 18;
+        ctx.shadowColor = `rgba(${line.color},1)`;
+        ctx.fillStyle = `rgba(${line.color},1)`;
+        ctx.fillText(line.text, W / 2, H * 0.8);
+        ctx.restore();
+        break; // 行同士は時間帯が重ならない設計だが念のため
+    }
+}
+
 function updateAndDrawTapHint(dt) {
     if (tapHintActive) {
         tapHintCycleTime += dt;
@@ -418,7 +480,7 @@ function updateAndDrawTapHint(dt) {
 /* resize()はここで一度呼んでおく必要がある。
    これより下のパーティクル初期化がW/Hに依存するため、
    呼び出しが後だとW/Hがundefined＝座標がNaNになり、
-   パーティクルが二度と表示されなくなる。（実際に起きたバグ） */
+   パーティクルが二度と表示されなくなる。(実際に起きたバグ) */
 resize();
 addEventListener("resize", resize);
 
@@ -616,6 +678,8 @@ function draw(now) {
         ctx.restore();
     }
 
+    drawIncantationText(phase);
+
     requestAnimationFrame(draw);
 }
 
@@ -632,7 +696,7 @@ function startBGM() {
     stopTapHint();
     bgm.play().catch(() => {
         /* 再生に失敗した場合は次のタップで再試行できるよう
-           リスナーを再登録する。 */
+           リスナーを再登録する */
         window.addEventListener("pointerdown", startBGM, { once: true });
     });
 }
