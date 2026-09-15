@@ -68,7 +68,7 @@ const clamp01 = v => Math.max(0, Math.min(1, v));
 /* ============================================================
    オフスクリーン・スプライト生成ユーティリティ
    重いshadowBlur／グラデーション計算は「一度だけ」ここで行い、
-   毎フレームはdrawImage（安価なビットブリット）だけで済ませる。
+   毎フレームはdrawImage（安価なビットブリット）だけで済ませる
    ============================================================ */
 function makeOffscreen(sizeCss) {
     const c = document.createElement("canvas");
@@ -191,14 +191,14 @@ function spokes(c, rInner, rOuter, count, alpha, color, altShort) {
 /* ============================================================
    魔法陣スプライトのビルド（リサイズ時のみ実行）
    6層すべての形状はbaseRadiusにのみ依存し、回転角は毎フレーム
-   ctx.rotate()で付与するだけなので、形状そのものは使い回せる。
+   ctx.rotate()で付与するだけなので、形状そのものは使い回せる
    ============================================================ */
 let magicSprites = null;
 let coreGlowSprite = null;
 let shockwaveSprite = null; // resize()より前に宣言する必要がある(TDZ回避)
 
 /* 衝撃波スプライトの生成関数と参照サイズも、resize()から呼ばれる
-   ため必ずここ(呼び出しより前)で定義しておく(TDZ回避)。 */
+   ため必ずここ(呼び出しより前)で定義しておく(TDZ回避) */
 const SHOCKWAVE_REF = 200;
 
 function buildShockwaveSprite() {
@@ -333,10 +333,10 @@ const streakCyan = buildStreakSprite("200,235,255");
 const streakGold = buildStreakSprite("255,225,170");
 const dotSprite = buildDotSprite();
 
-/* resize()はここで一度呼んでおく必要がある。
+/* resize()はここで一度呼んでおく必要がある
    これより下のパーティクル初期化がW/Hに依存するため、
    呼び出しが後だとW/Hがundefined＝座標がNaNになり、
-   パーティクルが二度と表示されなくなる（実際に起きたバグ）。 */
+   パーティクルが二度と表示されなくなる（実際に起きたバグ） */
 resize();
 addEventListener("resize", resize);
 
@@ -541,7 +541,7 @@ requestAnimationFrame(draw);
 /* ============================================================
    BGM再生：画面のどこか一箇所を一度タップ/クリックした時点で
    ループ再生を開始する（ブラウザの自動再生制限に対応するため、
-   ユーザー操作をきっかけに再生する必要がある）。
+   ユーザー操作で発火させる必要がある）
    ============================================================ */
 const bgm = document.getElementById("bgm");
 
