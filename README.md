@@ -8,4 +8,4 @@ https://maou.audio/category/se/se-magic/page/6/
 
 
 > [!TIP]
-> 改良点∶1タップで再生しない
+> 問題点∶1タップで再生しない
