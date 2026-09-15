@@ -1,7 +1,7 @@
 [![License](https://img.shields.io/github/license/24-blog/lsc)](LICENSE)
 
 
-## 呪文詠唱
+### 呪文詠唱
 いでよ浄闇を照らす砕けし星の陰<br>
 泥黎顕現<br>
 Shadow of Sundered Star
