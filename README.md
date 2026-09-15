@@ -8,5 +8,5 @@ https://maou.audio/category/se/se-magic/page/6/
 
 
 > [!TIP]
-> 問題点∶1タップで再生しない
-> 注意点∶リスト追加保留
+> 問題点∶1タップで再生しない<br>
+> 注意点∶リストには追加しない
