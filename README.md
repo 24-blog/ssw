@@ -18,4 +18,4 @@ https://maou.audio/category/se/se-magic/page/6/
 
 > [!TIP]
 > 問題点∶1タップで再生しない<br>
-> 注意点∶リストには追加しない
+> 注意点∶リストに追加しない
