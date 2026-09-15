@@ -697,11 +697,11 @@ function startBGM() {
     bgm.play().catch(() => {
         /* 再生に失敗した場合は次のタップで再試行できるよう
            リスナーを再登録する */
-        window.addEventListener("pointerdown", startBGM, { once: true });
+        window.addEventListener("click", startBGM, { once: true });
     });
 }
 
-window.addEventListener("pointerdown", startBGM, { once: true });
+window.addEventListener("click", startBGM, { once: true });
 </script>
 </body>
 </html>
