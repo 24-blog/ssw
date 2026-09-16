@@ -1,5 +1,10 @@
 [![License](https://img.shields.io/github/license/24-blog/lsc)](LICENSE)
 
+<p align="center">
+  <img src="firefox_view.jpg" width="320">
+</p>
+
+Firefoxでは魔法陣が崩れる。
 
 ### 呪文テキスト
 いでよ浄闇を照らす砕けし星のかげ<br>
