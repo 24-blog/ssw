@@ -12,7 +12,7 @@ Firefoxでは六芒星が崩れる。
 泥黎顕現<br>
 Shade of Sundered Star！！
 
-## サウンドエフェクト
+### サウンドエフェクト
 画面に触れると雷鳴
 
 ⚠️COPYRIGHT<br>
