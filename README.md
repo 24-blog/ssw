@@ -10,8 +10,10 @@ Firefoxでは六芒星が崩れる。
 ### 呪文テキスト
 いでよ浄闇を照らす砕けし星のかげ<br>
 泥黎顕現<br>
-Shade of Sundered Star！！<br>
-（画面に触れると雷鳴）
+Shade of Sundered Star！！
+
+## サウンドエフェクト
+画面に触れると雷鳴
 
 ⚠️COPYRIGHT<br>
 Textual commentary written by the repository owner is
