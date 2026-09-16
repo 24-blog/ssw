@@ -1,7 +1,7 @@
 [![License](https://img.shields.io/github/license/24-blog/lsc)](LICENSE)
 
 <p align="center">
-  <img src="firefox_view.jpg" width="320">
+  <img src="firefox_view.jpg" width="240">
 </p>
 
 Firefoxでは魔法陣が崩れる。
