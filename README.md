@@ -1,6 +1,7 @@
 [![License](https://img.shields.io/github/license/24-blog/lsc)](LICENSE)
 
 ### 動作テスト
+Known Issues
 <p align="center">
   <img src="firefox_view.jpg" width="240">
 </p>
