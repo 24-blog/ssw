@@ -24,7 +24,3 @@ licensed under CC BY-NC-ND 4.0.
 BGM∶maou_se_magic_thunder05<br>
 Composer∶魔王魂（森田交一）<br>
 https://maou.audio/category/se/se-magic/page/6/
-
-
-> [!TIP]
-> This URL has not been added yet.
