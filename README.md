@@ -19,8 +19,3 @@ Shade of Sundered Star！！
 ⚠️COPYRIGHT<br>
 Textual commentary written by the repository owner is
 licensed under CC BY-NC-ND 4.0.
-
-⚠️Sound Credits<br>
-SE∶maou_se_magic_thunder05<br>
-Composer∶魔王魂（森田交一）<br>
-https://maou.audio/category/se/se-magic/page/6/
