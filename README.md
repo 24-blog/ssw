@@ -3,7 +3,7 @@
 ### 動作テスト
 Known Issues
 <p align="center">
-  <img src="firefox_view.jpg" width="240">
+  <img src="assets/firefox_view.jpg" width="240">
 </p>
 
 Firefoxでは六芒星が崩れる。
