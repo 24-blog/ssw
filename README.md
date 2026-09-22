@@ -6,7 +6,7 @@ Known Issues
   <img src="assets/firefox_view.jpg" width="240">
 </p>
 
-Firefoxでは六芒星が崩れる。
+Firefoxだと六芒星が崩れる。
 
 ### 呪文テキスト
 いでよ浄闇を照らす砕けし星のかげ<br>
