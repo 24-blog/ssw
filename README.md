@@ -9,8 +9,7 @@ Shade of Sundered Star！！
 ### サウンドエフェクト
 画面に触れると雷鳴
 
-### 動作テスト
-Known Issues
+### Known Issues
 <p align="center">
   <img src="assets/firefox_view.jpg" width="240">
 </p>
